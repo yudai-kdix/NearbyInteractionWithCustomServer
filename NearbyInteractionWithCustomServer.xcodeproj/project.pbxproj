@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		BA1716742CF88F820031C351 /* InteractionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA1716732CF88F820031C351 /* InteractionManager.swift */; };
 		BA7A76132CF88CBB0069DDCC /* NearbyInteractionWithCustomServerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA7A76122CF88CBB0069DDCC /* NearbyInteractionWithCustomServerApp.swift */; };
 		BA7A76152CF88CBB0069DDCC /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA7A76142CF88CBB0069DDCC /* ContentView.swift */; };
 		BA7A76172CF88CBC0069DDCC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BA7A76162CF88CBC0069DDCC /* Assets.xcassets */; };
@@ -14,6 +15,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		BA1716732CF88F820031C351 /* InteractionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractionManager.swift; sourceTree = "<group>"; };
 		BA7A760F2CF88CBB0069DDCC /* NearbyInteractionWithCustomServer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NearbyInteractionWithCustomServer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BA7A76122CF88CBB0069DDCC /* NearbyInteractionWithCustomServerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbyInteractionWithCustomServerApp.swift; sourceTree = "<group>"; };
 		BA7A76142CF88CBB0069DDCC /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -53,6 +55,7 @@
 			children = (
 				BA7A76122CF88CBB0069DDCC /* NearbyInteractionWithCustomServerApp.swift */,
 				BA7A76142CF88CBB0069DDCC /* ContentView.swift */,
+				BA1716732CF88F820031C351 /* InteractionManager.swift */,
 				BA7A76162CF88CBC0069DDCC /* Assets.xcassets */,
 				BA7A76182CF88CBC0069DDCC /* Preview Content */,
 			);
@@ -137,6 +140,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BA1716742CF88F820031C351 /* InteractionManager.swift in Sources */,
 				BA7A76152CF88CBB0069DDCC /* ContentView.swift in Sources */,
 				BA7A76132CF88CBB0069DDCC /* NearbyInteractionWithCustomServerApp.swift in Sources */,
 			);
