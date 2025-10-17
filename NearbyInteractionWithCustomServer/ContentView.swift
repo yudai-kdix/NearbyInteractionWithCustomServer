@@ -5,6 +5,8 @@ struct ContentView: View {
 
   @State var textFieldValue = ""
   @State var distance: Float = 0.0
+  @State var azimuth: Float = 0.0
+  @State var elevation: Float = 0.0
 
   var body: some View {
     VStack {
@@ -49,7 +51,11 @@ struct ContentView: View {
           .padding()
       }
       Text(String(format: "Distance: %.1f", self.distance))
-        .padding()
+        .padding(.top)
+      Text(String(format: "Azimuth: %.1f°", self.azimuth * 180 / .pi))
+        .padding(.top, 4)
+      Text(String(format: "Elevation: %.1f°", self.elevation * 180 / .pi))
+        .padding(.top, 4)
     }
     .onReceive(self.interactionManager.distance) { distanceValue in
       let before = String(format: "%.1f", self.distance)
@@ -60,6 +66,10 @@ struct ContentView: View {
       }
 
       self.distance = distanceValue
+    }
+    .onReceive(self.interactionManager.direction) { direction in
+      self.azimuth = direction.azimuth
+      self.elevation = direction.elevation
     }
   }
   func hideKeyboard() {

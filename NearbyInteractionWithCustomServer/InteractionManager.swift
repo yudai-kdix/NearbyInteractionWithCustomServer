@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 import NearbyInteraction
+import simd
 
 struct HTTPResponseBody: Decodable {
   let id: Int
@@ -10,13 +11,18 @@ struct HTTPResponseBody: Decodable {
 
 class InteractionManager: NSObject, ObservableObject {
   // Please replace this URL with your Cloudflare Workers URL.
-  static let apiURL = "https://interaction.moutend.workers.dev"
+  static let apiURL = "https://interaction.yuuudaiiiiii.workers.dev"
 
   var distance: AnyPublisher<Float, Never> {
     self.distanceSubject.eraseToAnyPublisher()
   }
 
+  var direction: AnyPublisher<(azimuth: Float, elevation: Float), Never> {
+    self.directionSubject.eraseToAnyPublisher()
+  }
+
   private let distanceSubject = PassthroughSubject<Float, Never>()
+  private let directionSubject = PassthroughSubject<(azimuth: Float, elevation: Float), Never>()
 
   @Published var myTokenId: Int = 0
 
@@ -176,11 +182,21 @@ extension InteractionManager: NISessionDelegate {
   func session(_ session: NISession, didUpdate: [NINearbyObject]) {
     print("The session updates nearby objects")
     for update in didUpdate {
-      guard let distance = update.distance else {
-        continue
+      if let distance = update.distance {
+        DispatchQueue.main.async {
+          self.distanceSubject.send(distance)
+        }
       }
-      DispatchQueue.main.async {
-        self.distanceSubject.send(distance)
+      if let direction = update.direction {
+        let length = simd_length(direction)
+        if length > 0 {
+          let azimuth = atan2(direction.x, -direction.z)
+          let normalizedY = max(-1, min(1, direction.y / length))
+          let elevation = asin(normalizedY)
+          DispatchQueue.main.async {
+            self.directionSubject.send((azimuth, elevation))
+          }
+        }
       }
     }
   }
