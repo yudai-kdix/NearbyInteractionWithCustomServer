@@ -25,6 +25,8 @@ class InteractionManager: NSObject, ObservableObject {
   private let directionSubject = PassthroughSubject<(azimuth: Float, elevation: Float), Never>()
 
   @Published var myTokenId: Int = 0
+  @Published var preciseDistanceSupported: Bool = false
+  @Published var preciseAngleSupported: Bool = false
 
   private var session: NISession? = nil
   private var peerToken: NIDiscoveryToken? = nil
@@ -34,14 +36,16 @@ class InteractionManager: NSObject, ObservableObject {
     self.prepare()
   }
   func prepare() {
-    var isSupported: Bool
-
     if #available(iOS 16.0, watchOS 9.0, *) {
-      isSupported = NISession.deviceCapabilities.supportsPreciseDistanceMeasurement
+      let capabilities = NISession.deviceCapabilities
+      self.preciseDistanceSupported = capabilities.supportsPreciseDistanceMeasurement
+      self.preciseAngleSupported = capabilities.supportsPreciseAngleMeasurement
     } else {
-      isSupported = NISession.isSupported
+      self.preciseDistanceSupported = NISession.isSupported
+      self.preciseAngleSupported = false
     }
-    if !isSupported {
+
+    guard self.preciseDistanceSupported else {
       return
     }
 

@@ -50,6 +50,20 @@ struct ContentView: View {
         Text("Start")
           .padding()
       }
+      Text(
+        self.interactionManager.preciseDistanceSupported
+          ? "Precise distance measurement: Supported"
+          : "Precise distance measurement: Not supported"
+      )
+      .font(.footnote)
+      .padding(.top)
+      Text(
+        self.interactionManager.preciseAngleSupported
+          ? "Precise angle measurement: Supported"
+          : "Precise angle measurement: Not supported"
+      )
+      .font(.footnote)
+      .padding(.top, 2)
       Text(String(format: "Distance: %.1f", self.distance))
         .padding(.top)
       Text(String(format: "Azimuth: %.1f°", self.azimuth * 180 / .pi))
