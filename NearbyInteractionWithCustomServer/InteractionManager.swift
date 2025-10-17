@@ -3,6 +3,12 @@ import Foundation
 import NearbyInteraction
 import simd
 
+enum MeasurementSupportState {
+  case unknown
+  case supported
+  case unsupported
+}
+
 struct HTTPResponseBody: Decodable {
   let id: Int
   let token: String
@@ -26,10 +32,11 @@ class InteractionManager: NSObject, ObservableObject {
 
   @Published var myTokenId: Int = 0
   @Published var preciseDistanceSupported: Bool = false
-  @Published var preciseAngleSupported: Bool = false
+  @Published var preciseAngleSupportState: MeasurementSupportState = .unknown
 
   private var session: NISession? = nil
   private var peerToken: NIDiscoveryToken? = nil
+  private var directionlessUpdateCount = 0
 
   override init() {
     super.init()
@@ -39,10 +46,10 @@ class InteractionManager: NSObject, ObservableObject {
     if #available(iOS 16.0, watchOS 9.0, *) {
       let capabilities = NISession.deviceCapabilities
       self.preciseDistanceSupported = capabilities.supportsPreciseDistanceMeasurement
-      self.preciseAngleSupported = capabilities.supportsPreciseAngleMeasurement
+      self.preciseAngleSupportState = self.preciseDistanceSupported ? .unknown : .unsupported
     } else {
       self.preciseDistanceSupported = NISession.isSupported
-      self.preciseAngleSupported = false
+      self.preciseAngleSupportState = .unsupported
     }
 
     guard self.preciseDistanceSupported else {
@@ -51,6 +58,7 @@ class InteractionManager: NSObject, ObservableObject {
 
     self.session = NISession()
     session?.delegate = self
+    self.directionlessUpdateCount = 0
   }
   func getMyToken() {
     guard let session = self.session else {
@@ -162,6 +170,11 @@ class InteractionManager: NSObject, ObservableObject {
       return
     }
 
+    self.directionlessUpdateCount = 0
+    if self.preciseDistanceSupported {
+      self.preciseAngleSupportState = .unknown
+    }
+
     let configuration = NINearbyPeerConfiguration(peerToken: peerToken)
 
     guard let session = self.session else {
@@ -198,7 +211,18 @@ extension InteractionManager: NISessionDelegate {
           let normalizedY = max(-1, min(1, direction.y / length))
           let elevation = asin(normalizedY)
           DispatchQueue.main.async {
+            self.preciseAngleSupportState = .supported
+            self.directionlessUpdateCount = 0
             self.directionSubject.send((azimuth, elevation))
+          }
+        }
+      } else {
+        self.directionlessUpdateCount += 1
+        if self.preciseAngleSupportState == .unknown && self.directionlessUpdateCount > 10 {
+          DispatchQueue.main.async {
+            if self.preciseAngleSupportState == .unknown {
+              self.preciseAngleSupportState = .unsupported
+            }
           }
         }
       }

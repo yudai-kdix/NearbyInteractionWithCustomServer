@@ -57,13 +57,9 @@ struct ContentView: View {
       )
       .font(.footnote)
       .padding(.top)
-      Text(
-        self.interactionManager.preciseAngleSupported
-          ? "Precise angle measurement: Supported"
-          : "Precise angle measurement: Not supported"
-      )
-      .font(.footnote)
-      .padding(.top, 2)
+      Text(self.angleSupportMessage(self.interactionManager.preciseAngleSupportState))
+        .font(.footnote)
+        .padding(.top, 2)
       Text(String(format: "Distance: %.1f", self.distance))
         .padding(.top)
       Text(String(format: "Azimuth: %.1f°", self.azimuth * 180 / .pi))
@@ -90,6 +86,16 @@ struct ContentView: View {
     Timer.scheduledTimer(withTimeInterval: 0.25, repeats: false) { timer in
       UIApplication.shared.sendAction(
         #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+  }
+  private func angleSupportMessage(_ state: MeasurementSupportState) -> String {
+    switch state {
+    case .unknown:
+      return "Precise angle measurement: Checking..."
+    case .supported:
+      return "Precise angle measurement: Supported"
+    case .unsupported:
+      return "Precise angle measurement: Not supported"
     }
   }
 }
