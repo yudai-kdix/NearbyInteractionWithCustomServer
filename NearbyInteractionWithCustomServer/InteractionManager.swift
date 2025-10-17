@@ -177,6 +177,10 @@ class InteractionManager: NSObject, ObservableObject {
 
     let configuration = NINearbyPeerConfiguration(peerToken: peerToken)
 
+    if #available(iOS 16.0, *) {
+      configuration.isDirectionalMeasurementEnabled = true
+    }
+
     guard let session = self.session else {
       return
     }
