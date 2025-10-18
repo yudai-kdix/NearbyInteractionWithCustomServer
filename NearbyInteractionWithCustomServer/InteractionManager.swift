@@ -175,11 +175,17 @@ class InteractionManager: NSObject, ObservableObject {
       self.preciseAngleSupportState = .unknown
     }
 
-    let configuration = NINearbyPeerConfiguration(peerToken: peerToken)
+      let configuration = NINearbyPeerConfiguration(peerToken: peerToken)
 
-    if #available(iOS 16.0, *) {
-      configuration.isDirectionalMeasurementEnabled = true
-    }
+      // iOS 16以降でのみこのプロパティを設定
+        if #available(iOS 16.0, *) {
+          #if !targetEnvironment(simulator)
+          // リフレクションを使って設定（エラー回避）
+          if configuration.responds(to: Selector(("setIsDirectionalMeasurementEnabled:"))) {
+            configuration.setValue(true, forKey: "isDirectionalMeasurementEnabled")
+          }
+          #endif
+        }
 
     guard let session = self.session else {
       return
