@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 
 struct ContentView: View {
@@ -72,6 +73,43 @@ struct ContentView: View {
               .monospacedDigit()
           }
         }
+
+        Section("診断") {
+          self.diagnosticRow(label: "カメラ権限", value: self.cameraAuthorizationText)
+          if let hint = self.cameraAuthorizationHint {
+            Text(hint)
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          }
+
+          self.diagnosticRow(label: "自端末の対応", value: self.localCapabilityText)
+          if let hint = self.localCapabilityHint {
+            Text(hint)
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          }
+
+          if #available(iOS 17.0, *) {
+            self.diagnosticRow(label: "相手端末の対応", value: self.peerCapabilityText)
+            if let hint = self.peerCapabilityHint {
+              Text(hint)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+          }
+
+          if let error = self.interactionManager.lastSessionErrorDescription {
+            Text("セッションエラー: \(error)")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          }
+
+          if let coaching = self.angleSupportHint(self.interactionManager.preciseAngleSupportState) {
+            Text(coaching)
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          }
+        }
       }
       .navigationTitle("Nearby Interaction")
       .toolbar {
@@ -134,22 +172,120 @@ struct ContentView: View {
   private func angleSupportMessage(_ state: MeasurementSupportState) -> String {
     switch state {
     case .unknown:
-      return "Precise angle measurement: Checking..."
+      return "方角の詳細測定: 確認中"
     case .supported:
-      return "Precise angle measurement: Supported"
+      return "方角の詳細測定: 利用可能"
     case .unsupported:
-      return "Precise angle measurement: Not supported"
+      return "方角の詳細測定: 利用不可"
     }
   }
   private func angleSupportHint(_ state: MeasurementSupportState) -> String? {
     switch state {
     case .unknown:
-      return "To initialize direction, point the backs of both iPhones toward each other and move them slowly."
+      return "背面同士を向けて 0.3〜1 m の距離でゆっくり動かし、方角が収束するまで待ってください。"
     case .supported:
       return nil
     case .unsupported:
-      return "If direction stays unavailable, check Nearby Interaction and Camera permissions in Settings."
+      if self.interactionManager.cameraAuthorizationStatus == .denied
+        || self.interactionManager.cameraAuthorizationStatus == .restricted
+      {
+        return "設定アプリの「プライバシーとセキュリティ > カメラ」で本アプリのカメラ利用を許可してください。"
+      }
+
+      if #available(iOS 16.0, *),
+        let capability = self.interactionManager.localCapabilities,
+        !capability.supportsDirectionMeasurement
+      {
+        return "この端末はハードウェア仕様上、方角測定に対応していません。対応端末でお試しください。"
+      }
+
+      if #available(iOS 17.0, *),
+        let peerCapability = self.interactionManager.peerCapabilities,
+        !peerCapability.supportsDirectionMeasurement
+      {
+        return "相手端末が方角測定に対応していない可能性があります。別の端末で確認してください。"
+      }
+
+      return "カメラを遮らず、周囲に十分な明るさがある状態で再度計測を開始してください。"
     }
+  }
+  private func diagnosticRow(label: String, value: String) -> some View {
+    HStack {
+      Text(label)
+      Spacer()
+      Text(value)
+        .foregroundStyle(.secondary)
+    }
+  }
+  private var cameraAuthorizationText: String {
+    switch self.interactionManager.cameraAuthorizationStatus {
+    case .authorized:
+      return "許可済み"
+    case .denied:
+      return "拒否"
+    case .restricted:
+      return "制限中"
+    case .notDetermined:
+      return "未確認"
+    @unknown default:
+      return "不明"
+    }
+  }
+  private var cameraAuthorizationHint: String? {
+    switch self.interactionManager.cameraAuthorizationStatus {
+    case .authorized:
+      return nil
+    case .notDetermined:
+      return "「計測スタート」を押すとカメラ利用の確認ダイアログが表示されます。"
+    case .denied, .restricted:
+      return "設定アプリからカメラの利用を許可しない限り方角は取得できません。"
+    @unknown default:
+      return nil
+    }
+  }
+  private var localCapabilityText: String {
+    if #available(iOS 16.0, *), let capability = self.interactionManager.localCapabilities {
+      if capability.supportsAngleEstimation {
+        return "距離・方角に対応"
+      }
+      if capability.supportsPreciseDistanceMeasurement {
+        return "距離のみ対応"
+      }
+      return "未対応"
+    }
+
+    return self.interactionManager.preciseDistanceSupported ? "距離のみ対応" : "未対応"
+  }
+  private var localCapabilityHint: String? {
+    if #available(iOS 16.0, *), let capability = self.interactionManager.localCapabilities,
+      !capability.supportsAngleEstimation
+    {
+      return "ハードウェア仕様により方角測定が提供されません。"
+    }
+    return nil
+  }
+  @available(iOS 17.0, *)
+  private var peerCapabilityText: String {
+    guard let capability = self.interactionManager.peerCapabilities else {
+      return "未取得"
+    }
+    if capability.supportsAngleEstimation {
+      return "距離・方角に対応"
+    }
+    if capability.supportsPreciseDistanceMeasurement {
+      return "距離のみ対応"
+    }
+    return "未対応"
+  }
+  @available(iOS 17.0, *)
+  private var peerCapabilityHint: String? {
+    guard let capability = self.interactionManager.peerCapabilities else {
+      return "相手端末からトークンを取得後に情報が表示されます。"
+    }
+    if !capability.supportsAngleEstimation {
+      return "相手端末が方角測定に対応していない場合、方角は取得できません。"
+    }
+    return nil
   }
 }
 

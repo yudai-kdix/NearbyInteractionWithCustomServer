@@ -4,6 +4,16 @@ import Foundation
 import NearbyInteraction
 import simd
 
+struct DeviceCapabilitySnapshot: Equatable {
+  let supportsPreciseDistanceMeasurement: Bool
+  let supportsDirectionMeasurement: Bool
+  let supportsCameraAssistance: Bool
+
+  var supportsAngleEstimation: Bool {
+    self.supportsDirectionMeasurement && self.supportsPreciseDistanceMeasurement
+  }
+}
+
 enum MeasurementSupportState {
   case unknown
   case supported
@@ -34,6 +44,10 @@ class InteractionManager: NSObject, ObservableObject {
   @Published var myTokenId: Int = 0
   @Published var preciseDistanceSupported: Bool = false
   @Published var preciseAngleSupportState: MeasurementSupportState = .unknown
+  @Published var localCapabilities: DeviceCapabilitySnapshot?
+  @Published var peerCapabilities: DeviceCapabilitySnapshot?
+  @Published var cameraAuthorizationStatus: AVAuthorizationStatus = .notDetermined
+  @Published var lastSessionErrorDescription: String?
 
   private var session: NISession? = nil
   private var peerToken: NIDiscoveryToken? = nil
@@ -46,12 +60,22 @@ class InteractionManager: NSObject, ObservableObject {
   func prepare() {
     if #available(iOS 16.0, watchOS 9.0, *) {
       let capabilities = NISession.deviceCapabilities
-      self.preciseDistanceSupported = capabilities.supportsPreciseDistanceMeasurement
-      self.preciseAngleSupportState = self.preciseDistanceSupported ? .unknown : .unsupported
+      let snapshot = DeviceCapabilitySnapshot(
+        supportsPreciseDistanceMeasurement: capabilities.supportsPreciseDistanceMeasurement,
+        supportsDirectionMeasurement: capabilities.supportsDirectionMeasurement,
+        supportsCameraAssistance: capabilities.supportsCameraAssistance
+      )
+      self.localCapabilities = snapshot
+      self.preciseDistanceSupported = snapshot.supportsPreciseDistanceMeasurement
+      self.preciseAngleSupportState = snapshot.supportsAngleEstimation ? .unknown : .unsupported
     } else {
+      self.localCapabilities = nil
       self.preciseDistanceSupported = NISession.isSupported
       self.preciseAngleSupportState = .unsupported
     }
+
+    self.updateAngleSupportStateForCapabilities()
+    self.cameraAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
 
     guard self.preciseDistanceSupported else {
       return
@@ -158,7 +182,23 @@ class InteractionManager: NSObject, ObservableObject {
         let peerToken = try NSKeyedUnarchiver.unarchivedObject(
           ofClass: NIDiscoveryToken.self, from: peerTokenData)
 
-        self.peerToken = peerToken
+        DispatchQueue.main.async {
+          self.peerToken = peerToken
+
+          if #available(iOS 17.0, *), let peerToken = peerToken {
+            let capabilities = peerToken.deviceCapabilities
+            let snapshot = DeviceCapabilitySnapshot(
+              supportsPreciseDistanceMeasurement: capabilities.supportsPreciseDistanceMeasurement,
+              supportsDirectionMeasurement: capabilities.supportsDirectionMeasurement,
+              supportsCameraAssistance: capabilities.supportsCameraAssistance
+            )
+            self.peerCapabilities = snapshot
+          } else {
+            self.peerCapabilities = nil
+          }
+
+          self.updateAngleSupportStateForCapabilities()
+        }
       } catch {
         print("Failed to set peer token: \(error)")
       }
@@ -172,9 +212,11 @@ class InteractionManager: NSObject, ObservableObject {
     }
 
     self.directionlessUpdateCount = 0
-    if self.preciseDistanceSupported {
+    if self.preciseDistanceSupported && self.preciseAngleSupportState != .supported {
       self.preciseAngleSupportState = .unknown
     }
+
+    self.lastSessionErrorDescription = nil
 
     self.requestCameraAccessIfNeeded { [weak self] granted in
       guard let self = self else {
@@ -192,7 +234,19 @@ class InteractionManager: NSObject, ObservableObject {
       let configuration = NINearbyPeerConfiguration(peerToken: peerToken)
 
       if #available(iOS 16.0, *) {
-        configuration.isCameraAssistanceEnabled = true
+        var shouldEnableCameraAssistance = self.localCapabilities?.supportsCameraAssistance ?? false
+
+        if #available(iOS 17.0, *) {
+          if let peerSnapshot = self.peerCapabilities {
+            shouldEnableCameraAssistance =
+              shouldEnableCameraAssistance && peerSnapshot.supportsCameraAssistance
+          }
+        }
+
+        configuration.isCameraAssistanceEnabled = shouldEnableCameraAssistance
+        if !shouldEnableCameraAssistance && self.preciseAngleSupportState != .supported {
+          self.preciseAngleSupportState = .unsupported
+        }
       }
 
       guard let session = self.session else {
@@ -210,16 +264,35 @@ class InteractionManager: NSObject, ObservableObject {
     }
 
     if #available(iOS 16.0, *) {
-      switch AVCaptureDevice.authorizationStatus(for: .video) {
+      let status = AVCaptureDevice.authorizationStatus(for: .video)
+      self.cameraAuthorizationStatus = status
+
+      switch status {
       case .authorized:
+        self.updateAngleSupportStateForCapabilities()
         finishOnMain(true)
       case .notDetermined:
         AVCaptureDevice.requestAccess(for: .video) { granted in
+          let updatedStatus = AVCaptureDevice.authorizationStatus(for: .video)
+          DispatchQueue.main.async {
+            self.cameraAuthorizationStatus = updatedStatus
+            if granted {
+              self.updateAngleSupportStateForCapabilities()
+            } else if self.preciseAngleSupportState != .supported {
+              self.preciseAngleSupportState = .unsupported
+            }
+          }
           finishOnMain(granted)
         }
       case .denied, .restricted:
+        if self.preciseAngleSupportState != .supported {
+          self.preciseAngleSupportState = .unsupported
+        }
         finishOnMain(false)
       @unknown default:
+        if self.preciseAngleSupportState != .supported {
+          self.preciseAngleSupportState = .unsupported
+        }
         finishOnMain(false)
       }
     } else {
@@ -283,6 +356,50 @@ extension InteractionManager: NISessionDelegate {
     print("The end of a session’s suspension")
   }
   func session(_ session: NISession, didInvalidateWith: Error) {
-    print("Invalidated session")
+    DispatchQueue.main.async {
+      self.lastSessionErrorDescription = didInvalidateWith.localizedDescription
+      if self.preciseAngleSupportState != .supported {
+        self.preciseAngleSupportState = .unsupported
+      }
+    }
+    print("Invalidated session: \(didInvalidateWith)")
+  }
+}
+
+extension InteractionManager {
+  private func updateAngleSupportStateForCapabilities() {
+    guard self.preciseDistanceSupported else {
+      self.preciseAngleSupportState = .unsupported
+      return
+    }
+
+    if #available(iOS 16.0, *) {
+      if let localSnapshot = self.localCapabilities,
+        !localSnapshot.supportsDirectionMeasurement
+      {
+        self.preciseAngleSupportState = .unsupported
+        return
+      }
+
+      if #available(iOS 17.0, *), let peerSnapshot = self.peerCapabilities,
+        !peerSnapshot.supportsDirectionMeasurement
+      {
+        self.preciseAngleSupportState = .unsupported
+        return
+      }
+    }
+
+    if self.cameraAuthorizationStatus == .denied
+      || self.cameraAuthorizationStatus == .restricted
+    {
+      if self.preciseAngleSupportState != .supported {
+        self.preciseAngleSupportState = .unsupported
+      }
+      return
+    }
+
+    if self.preciseAngleSupportState != .supported {
+      self.preciseAngleSupportState = .unknown
+    }
   }
 }
