@@ -1,3 +1,4 @@
+import AVFoundation
 import Combine
 import Foundation
 import NearbyInteraction
@@ -175,17 +176,55 @@ class InteractionManager: NSObject, ObservableObject {
       self.preciseAngleSupportState = .unknown
     }
 
-    let configuration = NINearbyPeerConfiguration(peerToken: peerToken)
+    self.requestCameraAccessIfNeeded { [weak self] granted in
+      guard let self = self else {
+        return
+      }
+
+      guard granted else {
+        if self.preciseAngleSupportState == .unknown {
+          self.preciseAngleSupportState = .unsupported
+        }
+        print("Camera access denied; direction updates unavailable")
+        return
+      }
+
+      let configuration = NINearbyPeerConfiguration(peerToken: peerToken)
+
+      if #available(iOS 16.0, *) {
+        configuration.isCameraAssistanceEnabled = true
+      }
+
+      guard let session = self.session else {
+        return
+      }
+
+      session.run(configuration)
+    }
+  }
+  private func requestCameraAccessIfNeeded(completion: @escaping (Bool) -> Void) {
+    let finishOnMain: (Bool) -> Void = { granted in
+      DispatchQueue.main.async {
+        completion(granted)
+      }
+    }
 
     if #available(iOS 16.0, *) {
-      configuration.isDirectionalMeasurementEnabled = true
+      switch AVCaptureDevice.authorizationStatus(for: .video) {
+      case .authorized:
+        finishOnMain(true)
+      case .notDetermined:
+        AVCaptureDevice.requestAccess(for: .video) { granted in
+          finishOnMain(granted)
+        }
+      case .denied, .restricted:
+        finishOnMain(false)
+      @unknown default:
+        finishOnMain(false)
+      }
+    } else {
+      finishOnMain(true)
     }
-
-    guard let session = self.session else {
-      return
-    }
-
-    session.run(configuration)
   }
   func invalidate() {
     guard let session = self.session else {

@@ -273,6 +273,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"NearbyInteractionWithCustomServer/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Camera assistance improves direction estimation";
 				INFOPLIST_KEY_NSNearbyInteractionUsageDescription = "Measures distance to nearby device";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -306,6 +307,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"NearbyInteractionWithCustomServer/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Camera assistance improves direction estimation";
 				INFOPLIST_KEY_NSNearbyInteractionUsageDescription = "Measures distance to nearby device";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

@@ -60,6 +60,13 @@ struct ContentView: View {
       Text(self.angleSupportMessage(self.interactionManager.preciseAngleSupportState))
         .font(.footnote)
         .padding(.top, 2)
+      if let hint = self.angleSupportHint(self.interactionManager.preciseAngleSupportState) {
+        Text(hint)
+          .font(.caption)
+          .foregroundColor(.secondary)
+          .multilineTextAlignment(.center)
+          .padding(.horizontal)
+      }
       Text(String(format: "Distance: %.1f", self.distance))
         .padding(.top)
       Text(String(format: "Azimuth: %.1f°", self.azimuth * 180 / .pi))
@@ -96,6 +103,16 @@ struct ContentView: View {
       return "Precise angle measurement: Supported"
     case .unsupported:
       return "Precise angle measurement: Not supported"
+    }
+  }
+  private func angleSupportHint(_ state: MeasurementSupportState) -> String? {
+    switch state {
+    case .unknown:
+      return "To initialize direction, point the backs of both iPhones toward each other and move them slowly."
+    case .supported:
+      return nil
+    case .unsupported:
+      return "If direction stays unavailable, check Nearby Interaction and Camera permissions in Settings."
     }
   }
 }

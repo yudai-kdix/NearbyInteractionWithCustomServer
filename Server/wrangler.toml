@@ -8,5 +8,5 @@ enabled = true
 
 [[d1_databases]]
 binding = "DB"
-database_name = "your-database-name"
-database_id = "your-database-id"
+database_name = "testDb"
+database_id = "1e6bb61a-cb37-40da-a1da-bb0470304c7b"
